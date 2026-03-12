@@ -19,7 +19,7 @@ library(patchwork)
 
 rm(list = ls())
 
-source("D:/Project_longitudinal_methods/Manuscript/Code/supporting_functions_public.R")
+source("supporting_functions.R")
 
 ```
 
@@ -296,6 +296,7 @@ ggsave(plot = main_plot_fixed, filename= paste0(data_path, "/rates_plot_new.pdf"
 
 
 ```
+
 
 
 
