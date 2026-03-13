@@ -6,22 +6,22 @@ It contains both the code to reproduce results presented in the paper and an in-
 
 Lead developer: Mikkel Skjoldan Svenningsen
 
-# In depth analysis of two real-world repeated-measures proteomics datasets. 
-## Tumor dataset
+## In depth analysis of two real-world repeated-measures proteomics datasets. 
+### Tumor dataset
 
-## Weightloss dataset
+### Weightloss dataset
 
 
-# Code for reproducing results presented in the manuscript
+## Code for reproducing results presented in the manuscript
 
-## 0_test_performance.Rmd:
+### 0_test_performance.Rmd:
  - In silico generation of datasets resembling idealized repeated-measures proteomics datasets
  - Repeated-measures analysis of change over time/site (covariance pattern models)
     - Two covariance structures: Unstructured and compound symmetry    
  - Comparison of t-tests fit with ordinary F-test
  - Produces figure 2 from the manuscript
 
-## 1_small_samples_F_test.Rmd: 
+### 1_small_samples_F_test.Rmd: 
   - In silico generation of datasets resembling idealized repeated-measures proteomics datasets
      - Smaller sample sizes compared to previous analysis (0_test_performance) 
   - Repeated-measures analysis of change over time/site (covariance pattern models)
