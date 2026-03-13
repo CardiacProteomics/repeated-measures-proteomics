@@ -8,8 +8,14 @@ Lead developer: Mikkel Skjoldan Svenningsen
 
 ## Analysis of two real-world repeated-measures proteomics datasets. 
 ### Tumor dataset
-
+ - Analysis of the publicly available dataset from "Proteomic patterns associated with response to breast cancer neoadjuvant treatment".
+ - Data import and structuring
+ - Repeated measures analysis using covariance pattern models with unstructured covariance
+ - Volcano plots
+ - Trajectory clustering
+ - Functional analysis of trajectory clusters
 ### Weightloss dataset
+  
 
 
 ## Code for reproducing in-silico results presented in the manuscript
