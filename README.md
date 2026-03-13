@@ -6,13 +6,13 @@ It contains both the code to reproduce results presented in the paper and an in-
 
 Lead developer: Mikkel Skjoldan Svenningsen
 
-## In depth analysis of two real-world repeated-measures proteomics datasets. 
+## Analysis of two real-world repeated-measures proteomics datasets. 
 ### Tumor dataset
 
 ### Weightloss dataset
 
 
-## Code for reproducing results presented in the manuscript
+## Code for reproducing in-silico results presented in the manuscript
 
 ### 0_test_performance.Rmd:
  - In silico generation of datasets resembling idealized repeated-measures proteomics datasets
