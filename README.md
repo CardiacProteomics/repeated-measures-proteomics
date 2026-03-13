@@ -18,7 +18,7 @@ Lead developer: Mikkel Skjoldan Svenningsen
   
 
 
-## Code for reproducing in-silico results presented in the manuscript
+## Analysis of in-silico results presented in the manuscript
 
 ### 0_test_performance.Rmd:
  - In silico generation of datasets resembling idealized repeated-measures proteomics datasets
