@@ -28,6 +28,13 @@ Lead developer: Mikkel Skjoldan Svenningsen
      - Two covariance structures: Unstructured and compound symmetry
   - Comparison of ordinary F-tests with F-tests based on bootstrapping
   - Produces figure 3 from the manuscript
-
+  - 
+### 2_small_samples_ttest.Rmd: 
+  - In silico generation of datasets resembling idealized repeated-measures proteomics datasets
+     - Sample sizes: 10-25  
+  - Repeated-measures analysis of change over time/site (covariance pattern models)
+     - One covariance structures: Unstructured 
+  - Performance of T-test for small sample sizes
+  - Produces figure 4 from the manuscript
 
 
