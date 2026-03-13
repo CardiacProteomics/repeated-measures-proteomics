@@ -1,0 +1,223 @@
+---
+title: "In silico data models"
+author: "Mikkel Skjoldan Svenningsen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+
+
+
+
+```{r define data generating function, include=FALSE}
+library(ggplot2)
+library(ggpubr)
+library(MASS)
+library(LMMstar)
+library(mvtnorm)
+library(lavaSearch2)
+library(nlme)
+library(foreach)
+library(doParallel)
+library(compiler)
+library(foreach)
+library(doParallel)
+library(ggpubr)
+rm(list = ls())
+source("supporting_functions_public.R")
+
+here::i_am("1_small_samples_F_test.Rmd")
+
+
+```
+
+
+
+```{r run code, include=FALSE}
+
+library(MBESS)
+
+sig_means <- c(1, 1.5, 1.5, 1.5) # 0.35
+null_means <- c(1 ,1 ,1, 1)
+
+sig_fraction <- 0.5
+
+n_repeats <- 1000
+F_repeats <- 1000
+
+
+for(i in 1:1000){
+  
+  print(i)
+  
+rn <- sample(1:100000,1)
+
+Ns <- c(10,15,20,25,30,35,40)
+
+
+
+for(datatype in c("dvar", "dcc")){
+
+  print(datatype)
+  
+for(N in Ns){
+  
+  
+  if(datatype=="dvar"){
+    cc <- 0.5
+    cor_matrix <- toeplitz(c(1,cc,cc, cc))
+    sds <- seq(1,3,length=4)
+    cov_matrix <- cor2cov(cor_matrix, sds)
+  }else if(datatype=="dcc"){
+    cov_matrix <- toeplitz(c(1,0.8,0.5, 0.2))
+  }
+  
+  print(N)
+  
+  df_list <- generate_datasets(N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means)
+
+  df_fit <- run_tests_small_sample(df_list, N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means,  F, 0, F_repeats)
+
+  df_rates <- results_to_rates_small_sample(df_fit)
+  
+  data_path <- here(  "Numerical_data", "small_samples_F_test")
+
+  saveRDS(df_rates, paste0(data_path, "/df_rates_Ftest_", N, "_n_repeats=", n_repeats,"_F_repeats=", F_repeats, "_datatype=",datatype,"_", rn, ".rds"))
+
+}
+}
+}
+
+```
+
+
+```{r combined data and plot, include=FALSE}
+
+
+
+folder <- here(  "Numerical_data", "small_samples_F_test")
+
+
+files <- list.files(path = folder)
+
+
+df_combined <- do.call(rbind, lapply(files, function(file_i){
+  
+  df_i <- readRDS(paste0(folder,"/", file_i))
+  tmp <- strsplit(file_i, "_")[[1]]
+  
+  data.frame(
+    n_sig = as.numeric(df_i$extra_info[2]), 
+    n_nsig = as.numeric(df_i$extra_info[3]),
+    fpr_un = df_i$fpr_un[5],
+    fpr_cs = as.numeric(df_i$fpr_cs[5]),
+    fpr_boot = as.numeric(df_i$fpr_un[6]),
+    tpr_un = df_i$tpr_un[5],
+    tpr_cs = as.numeric(df_i$tpr_cs[5]),
+    tpr_boot = as.numeric(df_i$tpr_un[6]),
+    n_subjects =  tmp[4],
+    repeats =     strsplit(tmp[6], "=")[[1]][2], 
+    datatype =    strsplit(tmp[9], "=")[[1]][2]
+  )
+})) # do.call
+
+df_combined <- na.omit(df_combined)
+
+df_plot <- df_combined %>%
+group_by(n_subjects, datatype) %>%
+dplyr::summarize(fpr_cs = sum(fpr_cs*n_nsig)/sum(n_nsig), 
+          fpr_un = sum(fpr_un*n_nsig)/sum(n_nsig), 
+          fpr_boot = sum(fpr_boot*n_nsig)/sum(n_nsig), 
+          tpr_cs = sum(tpr_cs*n_sig)/sum(n_sig), 
+          tpr_un = sum(tpr_un*n_sig)/sum(n_sig), 
+          tpr_boot = sum(tpr_boot*n_sig)/sum(n_sig), 
+          ) %>%
+          as.data.frame()
+
+df_plot$x <- as.numeric(df_plot$n_subjects)
+
+lop <- list()
+
+for(i in 1:2){
+  
+  if(i==1){
+    label <- "dvar"
+    df_plot_i <- df_plot[df_plot$datatype == label, ]
+    title1 <- 'Significance level \nIncreasing variance'
+    title2 <- 'Power \nIncreasing variance'
+  }else{
+    label <- "dcc"
+    df_plot_i <- df_plot[df_plot$datatype == label, ]
+    title1 <- 'Significance level \nDecreasing correlation'
+    title2 <- 'Power \nDecreasing correlation'
+  }
+
+
+  
+  
+lop[[paste0(label, "1")]] <- ggplot(df_plot_i) + 
+  geom_line(aes(x=x, y=fpr_cs, color='Satterthwaite based F-test (CS)')) +
+  geom_line(aes(x=x, y=fpr_un, color='Satterthwaite based F-test (UN)')) +
+  geom_line(aes(x=x, y=fpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  geom_point(aes(x=x, y=fpr_cs, color='Satterthwaite based F-test (CS)')) +
+  geom_point(aes(x=x, y=fpr_un, color='Satterthwaite based F-test (UN)')) +
+  geom_point(aes(x=x, y=fpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  theme_bw() + 
+  geom_hline(yintercept = 0.05, linetype = "dashed") + 
+   scale_color_manual( 
+     name = "Type of F-test", 
+    values = c("Satterthwaite based F-test (UN)" = "blue", 
+               "Simulation based F-test (UN, LMMstar)" = "cyan4", 
+               "Satterthwaite based F-test (CS)" = "red")) + 
+  labs(x="Sample size", y ="False positive rate") + ggtitle( title1 ) + 
+  theme(legend.text = element_text(size = 14),
+        legend.title = element_text(size = 14), 
+  panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_blank(), 
+  text = element_text(size = 12)
+  )
+  
+
+lop[[paste0(label, "2")]] <- ggplot(df_plot_i) + 
+  geom_line(aes(x=x, y=tpr_cs, color='Satterthwaite based F-test (CS)')) +
+  geom_line(aes(x=x, y=tpr_un, color='Satterthwaite based F-test (UN)')) +
+  geom_line(aes(x=x, y=tpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  geom_point(aes(x=x, y=tpr_cs, color='Satterthwaite based F-test (CS)')) +
+  geom_point(aes(x=x, y=tpr_un, color='Satterthwaite based F-test (UN)')) +
+  geom_point(aes(x=x, y=tpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  theme_bw() + 
+
+   scale_color_manual( 
+     name = "Type of F-test", 
+    values = c("Satterthwaite based F-test (UN)" = "blue", 
+               "Simulation based F-test (UN, LMMstar)" = "cyan4", 
+               "Satterthwaite based F-test (CS)" = "red")) + 
+  labs(x="Sample size", y ="True positive rate")+ ggtitle( title2 )+  
+  theme(legend.text = element_text(size = 14), 
+        legend.title = element_text(size = 14), 
+  panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.5),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_blank(), 
+  text = element_text(size = 12)
+  )
+
+}
+
+
+g <- ggarrange(lop$dvar1, lop$dvar2, lop$dcc1, lop$dcc2,
+               common.legend = TRUE, ncol=4, 
+               legend = "bottom")+ theme(panel.border = element_blank())
+
+
+data_path <- here( "Figures")
+ggsave(plot = g, filename= paste0(data_path, "/small_samples_new.pdf"), width=14, height=5)
+
+
+```
+
+
+
