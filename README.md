@@ -34,7 +34,7 @@ Lead developer: Mikkel Skjoldan Svenningsen
      - Two covariance structures: Unstructured and compound symmetry
   - Comparison of ordinary F-tests with F-tests based on bootstrapping
   - Produces figure 3 from the manuscript
-  - 
+
 ### 2_small_samples_ttest.Rmd: 
   - In silico generation of datasets resembling idealized repeated-measures proteomics datasets
      - Sample sizes: 10-25  
@@ -43,4 +43,9 @@ Lead developer: Mikkel Skjoldan Svenningsen
   - Performance of T-test for small sample sizes
   - Produces figure 4 from the manuscript
 
+## Analysis of in-silico results presented in the Supplementary Material
 
+### 3_Satterthwaite_vs_KenwardRoger.Rmd:
+  - In silico generation of repeated-measures data
+  - Analysis using the mmrm package
+  - Comparison of Satterthwaite and Kenward-Roger degrees of freedom estimate for small sample sizes
