@@ -67,11 +67,9 @@ rn <- runif(1)
 
 if(rn<sig_fraction){ 
 sig_hit = T
-#M <- mvrnorm(N, sig_means, cov_matrix)
 M <- rmvnorm(N, sig_means, cov_matrix)
 }else{ 
 sig_hit = F
-#M <- mvrnorm(N, null_means, cov_matrix)
 M <- rmvnorm(N, null_means, cov_matrix)
 }
 
