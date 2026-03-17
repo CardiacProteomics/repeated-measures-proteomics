@@ -1,16 +1,16 @@
 ---
-title: "In silico data models"
+title: "Satterthwaite vs Kenward-Roger"
 author: "Mikkel Skjoldan Svenningsen"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
+  md_document:
+    variant: gfm
 ---
 
 
-
-
-
-
-```{r define data generating function, include=FALSE}
+```{r define data generating function, results = "hide", warning=FALSE, message = FALSE}
 library(ggplot2)
 library(ggpubr)
 library(MASS)
@@ -25,23 +25,21 @@ library(foreach)
 library(doParallel)
 library(mmrm)
 library(here)
+library(MBESS)
+library(mvtnorm)
+library(MASS)
 rm(list = ls())
 
 here::i_am("in_silico_analysis/3_Satterthwaite_vs_KenwardRoger.Rmd")
 source_path <- here("R")
-source(paste0(source_path, "/generate_datasets.R"))
 
+source(paste0(source_path, "/generate_datasets.R"))
 
 ```
 
 
 
-```{r run code, include=FALSE}
-
-library(MBESS)
-library(mvtnorm)
-library(MASS)
-
+```{r run analysis, results = "hide"}
 
 cov_matrix <- toeplitz(c(1,0.8,0.5, 0.2))
 sig_means <- c(1, 1.5, 1.5, 1.5) # 0.35
@@ -51,13 +49,8 @@ sig_fraction <- 0.5
 
 n_repeats <- 10
 
-
-
-
-
-
 for(j in 1:10){
-  print(j)
+
 sh <- c()
 pv_KR <- c()
 pv_S <- c()
@@ -65,41 +58,36 @@ nn <- c()
 
 for(N in c(7,8,9,10,11,12,13,14,15)){
   
-  
 list_of_dfs <- generate_datasets(N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means)
 
-
 for(df_cov in list_of_dfs){
+try({
+
+
+  fit_KR <- mmrm(
+    formula = dv ~ t + us(t | person),
+    data = df_cov,
+    optimizer = "BFGS", 
+    method = "Kenward-Roger"
+  )
+  
+  fit_S <- mmrm(
+    formula = dv ~ t + us(t | person),
+    data = df_cov,
+    optimizer = "BFGS", 
+    method = "Satterthwaite"
+  )
   
   
+  q_KR <- car::Anova(fit_KR, type="II")
+  q_S <- car::Anova(fit_S, type="II")
   
-  try({
-
-
-fit_KR <- mmrm(
-  formula = dv ~ t + us(t | person),
-  data = df_cov,
-  optimizer = "BFGS", 
-  method = "Kenward-Roger"
-)
-
-fit_S <- mmrm(
-  formula = dv ~ t + us(t | person),
-  data = df_cov,
-  optimizer = "BFGS", 
-  method = "Satterthwaite"
-)
-
-
-q_KR <- car::Anova(fit_KR, type="II")
-q_S <- car::Anova(fit_S, type="II")
-
-pv_KR <- c(pv_KR, q_KR$`Pr(>F)`)
-pv_S <- c(pv_S, q_S$`Pr(>F)`)
-
-nn <- c(nn, N)
-
-sh <- c(sh, unique(df_cov$sh))
+  pv_KR <- c(pv_KR, q_KR$`Pr(>F)`)
+  pv_S <- c(pv_S, q_S$`Pr(>F)`)
+  
+  nn <- c(nn, N)
+  
+  sh <- c(sh, unique(df_cov$sh))
 
 })
 }
@@ -115,12 +103,9 @@ saveRDS(df_res, paste0(data_path, "/df_SvsKR_", rn ,".rds"))
 
 }
 
-
-
-
 ```
 
-```{r plot, include=FALSE}
+```{r plot analysis}
 
 data_path <- here(  "Numerical_data", "S_vs_KR")
 folder <- data_path
@@ -150,14 +135,14 @@ df_plot <- df_res %>%
 
 
 g1 <- ggplot(df_plot) + 
-  geom_point(aes(x = n_person, y = fpr_KR, color= 'Kenward-Rogers' )) + 
-  geom_line(aes(x = n_person, y = fpr_KR, color= 'Kenward-Rogers' )) + 
+  geom_point(aes(x = n_person, y = fpr_KR, color= 'Kenward-Roger' )) + 
+  geom_line(aes(x = n_person, y = fpr_KR, color= 'Kenward-Roger' )) + 
   geom_point(aes(x = n_person, y = fpr_S, color= 'Satterthwaite' )) + 
   geom_line(aes(x = n_person, y = fpr_S, color= 'Satterthwaite' )) + 
   scale_color_manual( 
   name = "", 
   values = c( 
-           "Kenward-Rogers" = "steelblue", 
+           "Kenward-Roger" = "steelblue", 
            "Satterthwaite" = "red4"))  + 
   theme_bw() + 
   theme(
@@ -167,14 +152,14 @@ g1 <- ggplot(df_plot) +
   geom_hline(yintercept = 0.05, linetype = "dashed") 
 
 g2 <- ggplot(df_plot) + 
-  geom_point(aes(x = n_person, y = tpr_KR, color= 'Kenward-Rogers' )) + 
-  geom_line(aes(x = n_person, y = tpr_KR, color= 'Kenward-Rogers' )) + 
+  geom_point(aes(x = n_person, y = tpr_KR, color= 'Kenward-Roger' )) + 
+  geom_line(aes(x = n_person, y = tpr_KR, color= 'Kenward-Roger' )) + 
   geom_point(aes(x = n_person, y = tpr_S, color= 'Satterthwaite' )) + 
   geom_line(aes(x = n_person, y = tpr_S, color= 'Satterthwaite' )) + 
   scale_color_manual( 
   name = "", 
   values = c( 
-           "Kenward-Rogers" = "steelblue", 
+           "Kenward-Roger" = "steelblue", 
            "Satterthwaite" = "red4"))  + 
   theme_bw() + 
   theme(
@@ -189,7 +174,7 @@ g <- ggarrange(g1,g2, common.legend = TRUE, legend = "bottom")
 
 data_path <- here( "Figures")
 ggsave(plot = g, filename= paste0(data_path, "/sFig_KR_vs_S.pdf"), width=8, height=4)
-
+g
 
 ```
 
