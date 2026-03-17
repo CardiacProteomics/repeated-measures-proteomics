@@ -1,9 +1,8 @@
-# repeated-measures-proteomics
-This repository is related to the manuscript "Statistical Approaches for Repeated-Measures Proteomics Data”. 
-It contains both the code to reproduce results presented in the paper and an in-depth analysis of two real-world datasets, meant as a tutorial for the analysis of repeated-measures proteomics data. 
+# Repeated measures proteomics 
+This project considers statistical methods for analyzing repeated-measures proteomics data. We present two exemplary analyses of publicly available repeated-measures proteomics datasets: one dataset with repeated measurements over time and one dataset that mixes time and space. The two analyses represent our recommendations for repeated-measures analysis and are meant as tutorials. They are available in the folder "real_world_analysis". 
 
- 
-
+This repository is related to the manuscript "Statistical Approaches for Repeated-Measures Proteomics Data”. In addition to the two tutorials, it contains an analysis of advantages and pitfalls of various statistical repeated-measures methods. This is done by analysing in-silico generated idealized repeated-measures data. We introduce the use of covariance pattern models in the context of proteomics and show how this approach has several advantages over existing resources. The main issue is to control the false positive rate at the intended level (typically 5%), which is often not the case with existing resources. The analyses can be found in the folder "in_silico_analysis".    
+  
 Lead developer: Mikkel Skjoldan Svenningsen
 
 ## Analysis of two real-world repeated-measures proteomics datasets. 
