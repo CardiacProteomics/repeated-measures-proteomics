@@ -26,7 +26,10 @@ library(doParallel)
 library(mmrm)
 library(here)
 rm(list = ls())
+
 here::i_am("in_silico_analysis/3_Satterthwaite_vs_KenwardRoger.Rmd")
+source_path <- here("R")
+source(paste0(source_path, "/generate_datasets.R"))
 
 
 ```
@@ -46,6 +49,12 @@ null_means <- c(1 ,1 ,1, 1)
 
 sig_fraction <- 0.5
 
+n_repeats <- 10
+
+
+
+
+
 
 for(j in 1:10){
   print(j)
@@ -55,42 +64,28 @@ pv_S <- c()
 nn <- c()
 
 for(N in c(7,8,9,10,11,12,13,14,15)){
+  
+  
+list_of_dfs <- generate_datasets(N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means)
 
 
-
-for(i in 1:1000){
+for(df_cov in list_of_dfs){
   
   
   
   try({
-rn <- runif(1)
-
-if(rn<sig_fraction){ 
-sig_hit = T
-M <- rmvnorm(N, sig_means, cov_matrix)
-}else{ 
-sig_hit = F
-M <- rmvnorm(N, null_means, cov_matrix)
-}
-
-
-
-
-
-D_cov <- data.frame(dv = as.vector(t(M)),t = factor(rep(c(1,2,3,4),N)), person = factor(rep(1:N,each=4)) )
-
 
 
 fit_KR <- mmrm(
   formula = dv ~ t + us(t | person),
-  data = D_cov,
+  data = df_cov,
   optimizer = "BFGS", 
   method = "Kenward-Roger"
 )
 
 fit_S <- mmrm(
   formula = dv ~ t + us(t | person),
-  data = D_cov,
+  data = df_cov,
   optimizer = "BFGS", 
   method = "Satterthwaite"
 )
@@ -104,7 +99,7 @@ pv_S <- c(pv_S, q_S$`Pr(>F)`)
 
 nn <- c(nn, N)
 
-sh <- c(sh, sig_hit)
+sh <- c(sh, unique(df_cov$sh))
 
 })
 }
