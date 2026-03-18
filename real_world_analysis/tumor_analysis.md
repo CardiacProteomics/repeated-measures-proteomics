@@ -1,4 +1,4 @@
-# Analysis of tumor proteomes with both a time and space component
+# Analysis of repeated-measures tumor proteomics
 
 This dataset contains samples from 34 patients with breast cancer. For
 each patient there is sample of the tumor prior to treatment, a sample
@@ -37,6 +37,8 @@ prepared for analysis.
     patient2lymph_node  <- setNames(M$Lymph.node.involved, M$Patient.code)
     patient2age         <- setNames(M$Age, M$Patient.code)
 
+Next step is align to meta data with the proteomics data.
+
     # Construct dataframe with meta data (df_meta) 
     # Make sure that the data is aligned with df_dat
 
@@ -69,6 +71,10 @@ prepared for analysis.
 
     df_meta <- data.frame(patient, tissue, tumor_size, lymph_node, age)
     df_dat <- df_dat[, col_keep]
+
+The following is the actual analysis using covariance pattern models.
+Proteins are only kept in the analysis if the contain at least 70% real
+values. There are 3 repeated measurements across the *tissue* variable.
 
     df_fit <- df_meta
 
