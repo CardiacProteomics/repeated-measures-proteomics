@@ -26,9 +26,14 @@ library(doParallel)
 library(ggpubr)
 library(here)
 rm(list = ls())
-source("supporting_functions_public.R")
 
 here::i_am("1_small_samples_F_test.Rmd")
+
+source_path <- here("R")
+
+source(paste0(source_path, "/generate_datasets.R"))
+source(paste0(source_path, "/regression_analysis.R"))
+source(paste0(source_path, "/results_to_rates.R"))
 
 
 ```
