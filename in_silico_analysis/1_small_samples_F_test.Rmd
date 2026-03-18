@@ -102,42 +102,38 @@ for(N in Ns){
 
 
 
+
 folder <- here(  "Numerical_data", "small_samples_F_test")
 
 
 files <- list.files(path = folder)
 
 
-df_combined <- do.call(rbind, lapply(files, function(file_i){
+combined_results <- lapply(files, function(file_i){
   
   df_i <- readRDS(paste0(folder,"/", file_i))
   tmp <- strsplit(file_i, "_")[[1]]
+  df_i$datatype <-    strsplit(tmp[9], "=")[[1]][2]
+  df_i$n_subjects <-    tmp[4]
   
-  data.frame(
-    n_sig = as.numeric(df_i$extra_info[2]), 
-    n_nsig = as.numeric(df_i$extra_info[3]),
-    fpr_un = df_i$fpr_un[5],
-    fpr_cs = as.numeric(df_i$fpr_cs[5]),
-    fpr_boot = as.numeric(df_i$fpr_un[6]),
-    tpr_un = df_i$tpr_un[5],
-    tpr_cs = as.numeric(df_i$tpr_cs[5]),
-    tpr_boot = as.numeric(df_i$tpr_un[6]),
-    n_subjects =  tmp[4],
-    repeats =     strsplit(tmp[6], "=")[[1]][2], 
-    datatype =    strsplit(tmp[9], "=")[[1]][2]
-  )
-})) # do.call
+  return(df_i)
+})
+
+df_combined <- do.call(rbind, combined_results)
 
 df_combined <- na.omit(df_combined)
 
 df_plot <- df_combined %>%
 group_by(n_subjects, datatype) %>%
-dplyr::summarize(fpr_cs = sum(fpr_cs*n_nsig)/sum(n_nsig), 
-          fpr_un = sum(fpr_un*n_nsig)/sum(n_nsig), 
-          fpr_boot = sum(fpr_boot*n_nsig)/sum(n_nsig), 
-          tpr_cs = sum(tpr_cs*n_sig)/sum(n_sig), 
-          tpr_un = sum(tpr_un*n_sig)/sum(n_sig), 
-          tpr_boot = sum(tpr_boot*n_sig)/sum(n_sig), 
+dplyr::summarize(
+          fpr_cs = sum(fpr_pv_F_ordinary_CS*n_nsig)/sum(n_nsig), 
+          fpr_boot_cs = sum(fpr_pv_F_bootstrap_CS*n_nsig)/sum(n_nsig), 
+          fpr_un = sum(fpr_pv_F_ordinary_UN*n_nsig)/sum(n_nsig), 
+          fpr_boot_un = sum(fpr_pv_F_bootstrap_UN*n_nsig)/sum(n_nsig), 
+          tpr_cs = sum(tpr_pv_F_ordinary_CS*n_sig)/sum(n_sig), 
+          tpr_boot_cs = sum(tpr_pv_F_bootstrap_CS*n_sig)/sum(n_sig), 
+          tpr_un = sum(tpr_pv_F_ordinary_UN*n_sig)/sum(n_sig), 
+          tpr_boot_un = sum(tpr_pv_F_bootstrap_UN*n_sig)/sum(n_sig), 
           ) %>%
           as.data.frame()
 
@@ -164,18 +160,22 @@ for(i in 1:2){
   
 lop[[paste0(label, "1")]] <- ggplot(df_plot_i) + 
   geom_line(aes(x=x, y=fpr_cs, color='Satterthwaite based F-test (CS)')) +
+  geom_line(aes(x=x, y=fpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) +
   geom_line(aes(x=x, y=fpr_un, color='Satterthwaite based F-test (UN)')) +
-  geom_line(aes(x=x, y=fpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  geom_line(aes(x=x, y=fpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) + 
   geom_point(aes(x=x, y=fpr_cs, color='Satterthwaite based F-test (CS)')) +
   geom_point(aes(x=x, y=fpr_un, color='Satterthwaite based F-test (UN)')) +
-  geom_point(aes(x=x, y=fpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  geom_point(aes(x=x, y=fpr_boot_cs, color='Simulation based F-test (cs, bootstrap)')) + 
+  geom_point(aes(x=x, y=fpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) + 
   theme_bw() + 
   geom_hline(yintercept = 0.05, linetype = "dashed") + 
    scale_color_manual( 
      name = "Type of F-test", 
     values = c("Satterthwaite based F-test (UN)" = "blue", 
-               "Simulation based F-test (UN, LMMstar)" = "cyan4", 
-               "Satterthwaite based F-test (CS)" = "red")) + 
+               "Simulation based F-test (UN, bootstrap)" = "cyan4", 
+               "Satterthwaite based F-test (CS)" = "red", 
+      "Simulation based F-test (UN, bootstrap)" = "orange2")
+    ) + 
   labs(x="Sample size", y ="False positive rate") + ggtitle( title1 ) + 
   theme(legend.text = element_text(size = 14),
         legend.title = element_text(size = 14), 
@@ -190,17 +190,20 @@ lop[[paste0(label, "1")]] <- ggplot(df_plot_i) +
 lop[[paste0(label, "2")]] <- ggplot(df_plot_i) + 
   geom_line(aes(x=x, y=tpr_cs, color='Satterthwaite based F-test (CS)')) +
   geom_line(aes(x=x, y=tpr_un, color='Satterthwaite based F-test (UN)')) +
-  geom_line(aes(x=x, y=tpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  geom_line(aes(x=x, y=tpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) + 
+  geom_line(aes(x=x, y=tpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) + 
   geom_point(aes(x=x, y=tpr_cs, color='Satterthwaite based F-test (CS)')) +
   geom_point(aes(x=x, y=tpr_un, color='Satterthwaite based F-test (UN)')) +
-  geom_point(aes(x=x, y=tpr_boot, color='Simulation based F-test (UN, LMMstar)')) + 
+  geom_point(aes(x=x, y=tpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) +
+  geom_point(aes(x=x, y=tpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) +
   theme_bw() + 
-
    scale_color_manual( 
      name = "Type of F-test", 
     values = c("Satterthwaite based F-test (UN)" = "blue", 
-               "Simulation based F-test (UN, LMMstar)" = "cyan4", 
-               "Satterthwaite based F-test (CS)" = "red")) + 
+               "Simulation based F-test (UN, bootstrap)" = "cyan4", 
+               "Satterthwaite based F-test (CS)" = "red",
+              "Simulation based F-test (CS, bootstrap)" = "orange2")
+    ) + 
   labs(x="Sample size", y ="True positive rate")+ ggtitle( title2 )+  
   theme(legend.text = element_text(size = 14), 
         legend.title = element_text(size = 14), 
@@ -221,6 +224,8 @@ g <- ggarrange(lop$dvar1, lop$dvar2, lop$dcc1, lop$dcc2,
 
 data_path <- here( "Figures")
 ggsave(plot = g, filename= paste0(data_path, "/small_samples_new.pdf"), width=14, height=5)
+
+
 
 
 ```
