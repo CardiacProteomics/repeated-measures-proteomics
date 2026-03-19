@@ -47,7 +47,7 @@ run_tests <- function(list_of_D){
 
 
 
-run_tests_withPBS <- function(df_list, N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means, F_repeats, withCS) {
+run_tests_withPBS <- function(df_list, N, n_repeats, F_repeats, withCS) {
   
   
   # Set up parallel backend
@@ -91,7 +91,7 @@ run_tests_withPBS <- function(df_list, N, cov_matrix, n_repeats, sig_fraction, s
         F_val <- rep(NA, F_repeats)
         
         for (rep in 1:F_repeats) {
-          try({
+          #try({
             M_rep <- rmvnorm(N, mean_est, cov_mat_est)
             df_rep <- data.frame(
               dv = as.vector(t(M_rep)),
@@ -103,11 +103,12 @@ run_tests_withPBS <- function(df_list, N, cov_matrix, n_repeats, sig_fraction, s
             q_rep <- anova(cp_rep)
             F_val[rep] <- q_rep$multivariate$statistic
             
-          })
+          #})
         }
         F_val_real <- na.omit(F_val)
         F_org <- anova(cp_i)$multivariate$statistic
         pv_boot <- sum(F_val_real >= F_org) / length(F_val_real)
+        
         
         list_of_pvalues <- list()
         # Timepoint-specific p-values
