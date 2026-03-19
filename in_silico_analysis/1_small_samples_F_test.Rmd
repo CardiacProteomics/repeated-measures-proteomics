@@ -27,8 +27,7 @@ library(ggpubr)
 library(here)
 rm(list = ls())
 
-here::i_am("1_small_samples_F_test.Rmd")
-
+here::i_am("in_silico_analysis/1_small_samples_F_test.Rmd")
 source_path <- here("R")
 
 source(paste0(source_path, "/generate_datasets.R"))
@@ -47,13 +46,13 @@ library(MBESS)
 sig_means <- c(1, 1.5, 1.5, 1.5) # 0.35
 null_means <- c(1 ,1 ,1, 1)
 
-sig_fraction <- 0.5
+sig_fraction <- 0.1
 
-n_repeats <- 1000
+n_repeats <- 100
 F_repeats <- 1000
 
 
-for(i in 1:1000){
+for(i in c(1)){
   
   print(i)
   
@@ -80,22 +79,30 @@ for(N in Ns){
   }
   
   print(N)
-  
+
   df_list <- generate_datasets(N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means)
 
-  df_fit <- run_tests_small_sample(df_list, N, cov_matrix, n_repeats, sig_fraction, sig_means, null_means,  F, 0, F_repeats)
+  df_fit <- run_tests_withPBS(df_list,N, n_repeats, F_repeats, withCS = F)
+  
+  df_fit_noPBD <- run_tests(df_list)
+  
+  df_fit$pv_F_ordinary_CS <- df_fit_noPBD$pv_cs
 
-  df_rates <- results_to_rates_small_sample(df_fit)
+  df_rates <- get_rates(df_fit)
   
   data_path <- here(  "Numerical_data", "small_samples_F_test")
 
-  saveRDS(df_rates, paste0(data_path, "/df_rates_Ftest_", N, "_n_repeats=", n_repeats,"_F_repeats=", F_repeats, "_datatype=",datatype,"_", rn, ".rds"))
+  saveRDS(df_rates, paste0(data_path, "/df_rates_Ftest_", N, "_n_repeats=", n_repeats,"_F_repeats=", F_repeats, "_datatype=",datatype,"_", rn, "_noCS.rds"))
 
 }
 }
 }
+
 
 ```
+
+
+
 
 
 ```{r combined data and plot, include=FALSE}
@@ -119,19 +126,21 @@ combined_results <- lapply(files, function(file_i){
   return(df_i)
 })
 
-df_combined <- do.call(rbind, combined_results)
+df_combined <- dplyr::bind_rows(combined_results)
 
-df_combined <- na.omit(df_combined)
+
+
+
 
 df_plot <- df_combined %>%
 group_by(n_subjects, datatype) %>%
 dplyr::summarize(
           fpr_cs = sum(fpr_pv_F_ordinary_CS*n_nsig)/sum(n_nsig), 
-          fpr_boot_cs = sum(fpr_pv_F_bootstrap_CS*n_nsig)/sum(n_nsig), 
+          #fpr_boot_cs = sum(fpr_pv_F_bootstrap_CS*n_nsig)/sum(n_nsig), 
           fpr_un = sum(fpr_pv_F_ordinary_UN*n_nsig)/sum(n_nsig), 
           fpr_boot_un = sum(fpr_pv_F_bootstrap_UN*n_nsig)/sum(n_nsig), 
           tpr_cs = sum(tpr_pv_F_ordinary_CS*n_sig)/sum(n_sig), 
-          tpr_boot_cs = sum(tpr_pv_F_bootstrap_CS*n_sig)/sum(n_sig), 
+          #tpr_boot_cs = sum(tpr_pv_F_bootstrap_CS*n_sig)/sum(n_sig), 
           tpr_un = sum(tpr_pv_F_ordinary_UN*n_sig)/sum(n_sig), 
           tpr_boot_un = sum(tpr_pv_F_bootstrap_UN*n_sig)/sum(n_sig), 
           ) %>%
@@ -160,12 +169,12 @@ for(i in 1:2){
   
 lop[[paste0(label, "1")]] <- ggplot(df_plot_i) + 
   geom_line(aes(x=x, y=fpr_cs, color='Satterthwaite based F-test (CS)')) +
-  geom_line(aes(x=x, y=fpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) +
+  #geom_line(aes(x=x, y=fpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) +
   geom_line(aes(x=x, y=fpr_un, color='Satterthwaite based F-test (UN)')) +
   geom_line(aes(x=x, y=fpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) + 
   geom_point(aes(x=x, y=fpr_cs, color='Satterthwaite based F-test (CS)')) +
   geom_point(aes(x=x, y=fpr_un, color='Satterthwaite based F-test (UN)')) +
-  geom_point(aes(x=x, y=fpr_boot_cs, color='Simulation based F-test (cs, bootstrap)')) + 
+  #geom_point(aes(x=x, y=fpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) + 
   geom_point(aes(x=x, y=fpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) + 
   theme_bw() + 
   geom_hline(yintercept = 0.05, linetype = "dashed") + 
@@ -174,7 +183,7 @@ lop[[paste0(label, "1")]] <- ggplot(df_plot_i) +
     values = c("Satterthwaite based F-test (UN)" = "blue", 
                "Simulation based F-test (UN, bootstrap)" = "cyan4", 
                "Satterthwaite based F-test (CS)" = "red", 
-      "Simulation based F-test (UN, bootstrap)" = "orange2")
+      "Simulation based F-test (CS, bootstrap)" = "orange2")
     ) + 
   labs(x="Sample size", y ="False positive rate") + ggtitle( title1 ) + 
   theme(legend.text = element_text(size = 14),
@@ -191,11 +200,11 @@ lop[[paste0(label, "2")]] <- ggplot(df_plot_i) +
   geom_line(aes(x=x, y=tpr_cs, color='Satterthwaite based F-test (CS)')) +
   geom_line(aes(x=x, y=tpr_un, color='Satterthwaite based F-test (UN)')) +
   geom_line(aes(x=x, y=tpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) + 
-  geom_line(aes(x=x, y=tpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) + 
+  #geom_line(aes(x=x, y=tpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) + 
   geom_point(aes(x=x, y=tpr_cs, color='Satterthwaite based F-test (CS)')) +
   geom_point(aes(x=x, y=tpr_un, color='Satterthwaite based F-test (UN)')) +
   geom_point(aes(x=x, y=tpr_boot_un, color='Simulation based F-test (UN, bootstrap)')) +
-  geom_point(aes(x=x, y=tpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) +
+  #geom_point(aes(x=x, y=tpr_boot_cs, color='Simulation based F-test (CS, bootstrap)')) +
   theme_bw() + 
    scale_color_manual( 
      name = "Type of F-test", 
