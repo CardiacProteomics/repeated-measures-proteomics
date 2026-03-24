@@ -1,0 +1,386 @@
+---
+title: "weightloss_analysis"
+author: "Mikkel Skjoldan Svenningsen"
+date: "2026-03-16"
+output: html_document
+---
+
+# Analysis of repeated-measures weightloss proteomics  
+This dataset contains plasma samples from 102 patients prior to and following weightloss. It is a repeated-measures longitudinal dataset: each patient were sampled at -8,0,4,13,26,39, and 52 weeks. Since there are 7 measurements from each patient, the measurements are not independent and should be analyzed with repeated-measures statistics. First the publicly data is imported and prepared for analysis. 
+
+```{r import data and metadata, include=FALSE}
+
+library(nlme)
+library(lme4)
+library(lmerTest)
+library(tidyr)
+library(readxl)
+library(LMMstar)
+library(ggplot2)
+library(dplyr)
+library(Hmisc)
+library(here)
+
+here::i_am("in_silico_analysis/6_supplement_missing_values.Rmd")
+
+M <- read_excel("D:/Data_PRIDE/Mann_obesity (PXD004242)/data_modified.xlsx", sheet="Meta")
+D <- read_excel("D:/Data_PRIDE/Mann_obesity (PXD004242)/data_modified.xlsx", sheet="Data_sub")
+
+t_in <- c(1,2,3,4,5,6,7)
+w_in <- c(-8, 0, 4, 13, 26, 39, 52)
+
+uid2gene <- setNames(D$`Majority protein IDs`, D$`Gene names`)
+
+time2week <- w_in
+names(time2week) <- t_in
+
+person <- c()
+time <- c()
+bmi <- c()
+height <- c()
+weight <- c()
+for(col in colnames(M[, -1])){
+  a <- strsplit(col, "_")[[1]]
+  person <- c(person, a[2])
+  time <- c(time, unname(time2week[a[3]]))
+  weight <- c(weight, as.numeric(M[1, col]))
+  bmi <- c(bmi, as.numeric(M[2, col]))
+  height <- c(height, sqrt(as.numeric(M[1, col])/as.numeric(M[2, col])))
+}
+
+df_meta <- data.frame( person, time, weight, bmi, height)
+
+df_meta <- df_meta %>%
+  group_by(person) %>%
+  mutate(height_estimate = mean(height, na.rm = TRUE)) %>%
+  as.data.frame()
+
+df_meta$bmi_calc <- (df_meta$weight)/(df_meta$height_estimate^2)
+
+
+df_meta$bmi_cat <- cut2(df_meta$bmi_calc, g = 4)
+
+df_in <- data.frame(D)
+
+df_dat <- df_in[, c(-1,-2,-3)]
+
+rownames(df_dat) <- df_in$Majority.protein.IDs
+
+df_dat[df_dat=="NaN"] <- NA 
+```
+
+The repeated-measures statistical analysis. 
+
+
+```{r setup, include=FALSE}
+
+df_fit <- data.frame(dv = dim(df_meta)[1], 
+                     time = factor(as.numeric(df_meta$time)), 
+                     person = df_meta$person, 
+                     weight = df_meta$weight, 
+                     weight_binary = ifelse(df_meta$weight<87.05, 1, 0), 
+                     bmi = df_meta$bmi_calc, 
+                     bmi_cat = factor(as.integer(df_meta$bmi_cat)))
+
+rows <- rownames(df_dat)
+
+safe_extract <- function(expr){
+  tryCatch(expr, error = function(e) NA)
+  
+}
+
+time_labels <- c("time0", "time4", "time13", "time26", "time39", "time52")
+
+M_time <- combn(time_labels, 2)
+
+time_list1 <- M_time[1, ]
+time_list2 <- M_time[2, ]
+
+
+res <- lapply(rows, function(row){
+  
+  y <- as.numeric(df_dat[row, ])
+  print(row)
+  if(mean(!is.na(y))<0.7){ return(NULL) }
+    
+  ind_real <- !is.na(y)
+  df_fit$dv <- y
+  
+  
+  fit <- try(lmm(dv ~ time, repetition = ~time|person, structure = "UN", data = df_fit[ind_real, ]))
+  
+  print(which(rows == row))
+  
+  q <- try(anova(fit))
+  
+  b_success1 <- !inherits(fit, "try-error")
+  b_success2 <- !inherits(q, "try-error")
+  
+  if(!b_success1 | !b_success2) return(NULL)
+
+  
+  q <- anova(fit)
+  lop <- list()
+  lopar <- list()
+  
+  df_coef <- data.frame(coef(fit))
+  
+  for(time_label_i in time_labels){
+    lop[[time_label_i]] <- safe_extract( anova(fit, effects = c(paste0(time_label_i, "=0")))$multivariate$p.value)
+  }
+  
+  
+  for(time_label_i in time_list1){
+    
+    for(time_label_j in time_list2){
+   
+      if(time_label_i != time_label_j){
+        lop[[paste0(time_label_i, "vs", time_label_j)]] <- safe_extract( anova(fit, effects = c(paste0(time_label_i,"-", time_label_j, "=0")))$multivariate$p.value)
+      }
+    }
+  }
+  
+  for(time_label_i in time_labels){
+    lopar[[paste0("par_", time_label_i)]] <- df_coef[rownames(df_coef)==time_label_i, ]
+  }
+  
+   for(time_label_i in time_list1){
+    
+    
+    for(time_label_j in time_list2){
+   
+      if(time_label_i != time_label_j){
+        lopar[[paste0("par_", time_label_i, "vs", time_label_j)]] <- df_coef[rownames(df_coef)==time_label_j, ] - df_coef[rownames(df_coef)==time_label_i, ]
+      }
+    }
+  }
+    
+    
+      
+    df_out <- data.frame(lop)
+    
+    gn <-  D[D$`Majority protein IDs`==row, ]$`Gene names`
+    
+    print(gn)
+    
+    df_out$gene <- gn
+    df_out$uid <- row
+    
+    df_out <- cbind(df_out, data.frame(lopar))
+
+  return(df_out)
+    
+    
+}) # lapply 
+
+
+df_results <- do.call(rbind, res)
+
+
+list_fdrs <- list()
+  
+for(time_label_i in time_list1){
+
+    list_fdrs[[paste0("fdr_",time_label_i)]] <- p.adjust(df_results[[time_label_i]], method = "BH")
+  
+  
+  for(time_label_j in time_list2){
+ 
+    if(time_label_i != time_label_j){
+      list_fdrs[[paste0("fdr_",time_label_i,"vs", time_label_j)]] <- p.adjust(df_results[[paste0( time_label_i,"vs", time_label_j)]], method = "BH")
+    }
+  }
+}
+
+
+df_plot <- cbind(df_results, as.data.frame(list_fdrs))
+
+df_sub <- df_plot %>%
+  dplyr::select(contains("fdr_t")) %>% 
+  mutate(min_fdr_t = apply(., 1, min, na.rm = TRUE))
+
+df_plot$min_fdr_t <- df_sub$min_fdr_t
+df_plot$sig_tt <- df_plot$min_fdr_t<0.05
+
+saveRDS(df_plot, file = "D:/Project_longitudinal_methods/Manuscript/Github_structure/Results_real_world/weightloss/df_regression_onlyTime_.rds")
+
+```
+
+
+
+```{r find trajectories }
+
+
+
+data_path <- here(  "Results_real_world", "weightloss")
+
+df_plot <- readRDS(file = paste0(data_path, "/df_regression_onlyTime.rds"))
+
+### add new significance criterium
+
+df_sub <- df_plot %>%
+  dplyr::select(contains("fdr_t")) %>% 
+  dplyr::select(-contains("vs")) %>%
+    dplyr::select(-contains("min")) %>%
+  mutate(min_fdr_t_vs0 = apply(., 1, min, na.rm = TRUE))
+
+df_plot$min_fdr_t_vs0 <- df_sub$min_fdr_t_vs0
+df_plot$sig_tt_vs0 <- df_plot$min_fdr_t_vs0<0.05
+
+ind_sig <- df_plot$sig_tt_vs0
+ind <- rownames(df_dat) %in% df_plot[ind_sig, ]$uid
+
+df_par <- df_plot[ind_sig, ] %>%
+  select(par_time0, par_time4, par_time13, par_time26, par_time39, par_time52)
+
+rownames(df_par) <-df_plot[ind_sig, ]$uid
+
+df_sc <- t(scale(t(df_par)))
+
+data_path <- here(  "Figures")
+
+p <- pheatmap(df_sc, cutree_rows = 6, 
+              filename = paste0(data_path, "/pheatmap_weightloss.pdf"), 
+              show_rownames = FALSE, show_colnames = FALSE)
+
+ord <- p$tree_row$order
+clusters <- cutree(p$tree_row, k=6)
+arrangement <- unique(clusters[ord])
+
+
+term_clusters <- data.frame(
+  Cluster = clusters, 
+  order = ord
+)
+
+
+count <- 0
+dd <- list()
+lop <- list()
+for(cluster_i in unique(clusters)){
+  
+  count <- count + 1
+  
+  y <- c()
+  ti <- c()
+  patient <- c()
+  names <- rownames(term_clusters[term_clusters$Cluster==cluster_i, ])
+  nn <- c()
+  for(name_i in names){
+    y <- c(y, c(0, as.numeric(df_sc[name_i, ])))
+    ti <- c(ti, c(-8,0,4,13,26,39,52))
+    nn <- c(nn, rep(name_i,7))
+
+  }
+  
+  df_plot <- data.frame(y,ti, nn)
+
+  df_plot$nn <- factor(df_plot$nn, levels = unique(df_plot$nn))
+  df_plot$ti <- factor(df_plot$ti, levels = c(-8,0,4,13,26,39,52))
+  
+   dd[[cluster_i]] <- df_plot
+
+   
+  df_me <- df_plot %>%
+  group_by(ti) %>%
+  dplyr::summarise(mean_y = mean(y, na.rm = TRUE)) %>%
+  mutate(ti = factor(ti, levels = levels(df_plot$ti)))
+   
+if(count == 0){
+  g <- ggplot(df_plot) + 
+    geom_line(aes(ti, y, group = nn), alpha = 0.1) + 
+    geom_line(data = df_me, aes(ti, mean_y, group = 1), color = "red", size = 1.2) +  # Add mean trajectory
+    labs(x = "", y = "standardized mean protein intensity") + 
+    #scale_x_discrete(labels = c("A" = "Tumor-pre", "B" = "Tumor-post", "C" = "Normal")) + 
+    theme_minimal() + 
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12 ), 
+          panel.grid.major.y = element_blank(),
+          panel.grid.minor = element_blank())
+  
+} else {
+  g <- ggplot(df_plot) + 
+    geom_line(aes(ti, y, group = nn), alpha = 0.1) + 
+    geom_line(data = df_me, aes(ti, mean_y, group = 1), color = "red", size = 1.2) +  # Add mean trajectory
+    labs(x = "", y = NULL) + 
+    #scale_x_discrete(labels = c("A" = "Tumor-pre", "B" = "Tumor-post", "C" = "Normal")) + 
+    theme_minimal() + 
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.title.y = element_blank(), 
+          axis.text.x = element_text(angle = 45, hjust = 1, size = 12), 
+         panel.grid.major.y = element_blank(),
+          panel.grid.minor = element_blank())
+}
+  
+  
+  lop[[cluster_i]] <- g
+ 
+}
+
+
+g <- ggarrange(lop[[1]], lop[[2]], lop[[3]], lop[[4]], lop[[5]],lop[[6]], ncol = 6)
+
+
+data_path <- here(  "Figures")
+
+ggsave(plot = g, paste0(data_path, "/obesity_trajectories_.pdf"), width=8, height=3)
+
+
+```
+
+```{r example functional analysis of trajectory clusters}
+
+source("D:/Automated_functional_analysis/R/functions_functional_analysis.R")
+
+### tmp
+
+universe <- D$`Gene names`
+
+uid2gene <- setNames(D$`Gene names`, D$`Majority protein IDs`)
+
+list_of_ora_art <- list()
+for(i in unique(clusters)){
+
+  
+  ind <- clusters == i 
+  names_sub <- names(clusters)[ind]
+  
+  genes_sub <- c()
+  for(name in names_sub){
+    genes_sub <- c(genes_sub, uid2gene[[name]])
+  }
+  
+  folder_databases <- "N:/SUN-BMI-CardiacProteomics/Scripts/Mikkel/automated-functional-analysis"
+  
+  database <- get_database( "reactome_human", folder_databases )
+  
+  out1 <- genes_ORA(genes_sub, universe, database, 5,500)
+
+  list_of_ora_art[[i]] <- out1[out1$pv_bh<=0.2, ]$functional_category
+  
+  ora_plot <- out1[out1$pv_bh<=0.2, ]
+
+  ora_plot <- ora_plot[order(ora_plot$gene_ratio), ]
+  
+  
+  print(ora_plot)
+  #ora_plot$pw_nice <- substr(ora_plot$pw_nice, 1, 50)
+  #ora_plot$pw_nice <- factor(ora_plot$pw_nice, levels = ora_plot$pw_nice)
+  
+  #g <- ggplot(ora_plot, aes(x = gene_ratio, y = pw, size = gene_count, color = pv_bh)) +
+  #  geom_point() +
+  #  scale_color_gradient(low = "red", high = "blue") +
+  #  theme_bw() +
+  #  labs(title = paste0("ORA ART cluster:", i, "_size:", sum(ind)), x = "Gene Ratio", y = "Description", color = "Adjusted P-value", size = "Count")
+  
+  #ggsave(filename = paste0("E:/Project_longitudinal_methods/Figures/Geiger ORA/cluster_art_",i, ".png"), plot = g)
+  
+}
+
+
+
+
+
+```
+
+
